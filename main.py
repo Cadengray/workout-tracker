@@ -3,6 +3,7 @@ from motion_simulator import load_wisdm, get_magnitude, generate_motion
 from filters import low_pass_filter, compute_jerk
 from rep_counter import find_rep_indices, segment_reps
 from form_analyzer import analyze_reps, summarize, print_report
+from exercise_classifier import train_classifier, predict_activity
 from graphs import plot_motion, plot_axes, plot_rep_comparison
 
 # ─────────────────────────────────────────────
@@ -13,6 +14,10 @@ WISDM_FILE    = 'WISDM_ar_v1.1_raw.txt'
 ACTIVITY      = 'Jogging'
 USER_ID       = 33
 USE_REAL_DATA = True
+TRAIN_MODEL   = True   # set False after first run to skip retraining
+
+# activities to train the classifier on
+TRAIN_ACTIVITIES = ['Jogging', 'Walking', 'Sitting', 'Standing', 'Stairs']
 
 # ─────────────────────────────────────────────
 # LOAD DATA
@@ -39,6 +44,39 @@ if USE_REAL_DATA:
         t, motion, fs = generate_motion()
 else:
     t, motion, fs = generate_motion()
+
+# ─────────────────────────────────────────────
+# TRAIN CLASSIFIER (first run only)
+# ─────────────────────────────────────────────
+
+if TRAIN_MODEL:
+    print("\nTraining exercise classifier...")
+    data_by_activity = {}
+    for activity in TRAIN_ACTIVITIES:
+        try:
+            act_df, _ = load_wisdm(WISDM_FILE, activity_filter=activity)
+            act_df = get_magnitude(act_df)
+            data_by_activity[activity] = act_df['magnitude'].values
+            print(f"  Loaded {len(act_df)} samples for '{activity}'")
+        except ValueError:
+            print(f"  Skipping '{activity}' — no data found")
+
+    if len(data_by_activity) >= 2:
+        clf, le, report = train_classifier(data_by_activity, fs)
+        print("\nClassifier accuracy report:")
+        print(report)
+    else:
+        print("Not enough activities to train — skipping classifier.")
+
+# ─────────────────────────────────────────────
+# PREDICT ACTIVITY
+# ─────────────────────────────────────────────
+
+try:
+    predicted, confidence = predict_activity(motion, fs)
+    print(f"\nPredicted activity: {predicted} (confidence: {confidence:.0%})")
+except FileNotFoundError:
+    print("\nNo classifier model found — skipping prediction.")
 
 # ─────────────────────────────────────────────
 # FILTER
