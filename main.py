@@ -1,7 +1,8 @@
 import numpy as np
 from motion_simulator import load_wisdm, get_magnitude, generate_motion
 from filters import low_pass_filter, compute_jerk
-from rep_counter import find_rep_indices
+from rep_counter import find_rep_indices, segment_reps
+from form_analyzer import analyze_reps, summarize, print_report
 from graphs import plot_motion, plot_axes, plot_rep_comparison
 
 # ─────────────────────────────────────────────
@@ -44,18 +45,27 @@ else:
 # ─────────────────────────────────────────────
 
 filtered = low_pass_filter(motion, cutoff=0.8, fs=fs)
-print(f"\nFiltering applied — cutoff: 3.0 Hz")
+print(f"\nFiltering applied — cutoff: 0.8 Hz")
 
 # ─────────────────────────────────────────────
-# COUNT REPS ON FILTERED SIGNAL
+# COUNT REPS + SEGMENT
 # ─────────────────────────────────────────────
 
 reps, rep_indices = find_rep_indices(filtered, fs=fs, min_rep_duration=0.8)
+segments = segment_reps(filtered, rep_indices)
 print(f"Detected reps: {reps}")
+
+# ─────────────────────────────────────────────
+# FORM ANALYSIS
+# ─────────────────────────────────────────────
+
+rep_metrics = analyze_reps(filtered, rep_indices, segments, fs)
+summary     = summarize(rep_metrics)
+print_report(rep_metrics, summary)
 
 # ─────────────────────────────────────────────
 # VISUALISE
 # ─────────────────────────────────────────────
 
-# show raw vs filtered with rep markers
 plot_motion(t, motion, filtered=filtered, rep_indices=rep_indices)
+plot_rep_comparison(segments, title="Rep-by-rep form comparison")
